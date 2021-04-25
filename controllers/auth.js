@@ -1,10 +1,11 @@
 //Model
 const UserSchema = require('../model/auth');
 //Validation
-const { signupValidation } = require('../validations/auth');
-
+const { signupValidation, signinValidation } = require('../validations/auth');
+const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 
+//Create new user
 exports.createUser = async (req, res) => {
   try {
     // Date Validation
@@ -52,10 +53,38 @@ exports.createUser = async (req, res) => {
   }
 };
 
-exports.signinUser = (req, res) => {
-  // Sign in user
-};
+// Signin user
+exports.signinUser = async (req, res) => {
+  try {
+    const result = signinValidation(req.body);
+    if (result.error)
+      return res.status(404).send(result?.error?.details[0]?.message);
 
-exports.getUser = (req, res) => {
-  // Get User
+    const { email, password } = req.body;
+    const hasUser = await UserSchema.findOne({ email });
+    if (!hasUser)
+      return res
+        .status(404)
+        .json({ success: false, message: 'Something went wrong' });
+
+    const matchPassword = await bcrypt.compareSync(password, hasUser.password);
+    if (!matchPassword)
+      return res
+        .status(404)
+        .json({ success: false, message: 'Something went wrong' });
+
+    const token = jwt.sign({ id: hasUser._id }, process.env.SECRET_CODE);
+
+    const userObject = {
+      name: hasUser.name,
+      email: hasUser.email,
+      token,
+    };
+
+    res.status(200).json({ success: true, user: userObject });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, message: 'Internal Server Error Occurred' });
+  }
 };
